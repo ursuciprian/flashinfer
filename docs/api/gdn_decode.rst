@@ -17,8 +17,8 @@ recurrent gated delta-rule update for the current decode step.
     gated_delta_rule_mtp
     gated_delta_rule_replayssm_commit
 
-ReplaySSM speculative verification (SM100/SM103)
----------------------------------------------
+ReplaySSM speculative verification (SM100/SM103, SM120/SM121)
+-------------------------------------------------------------
 
 Use ``gated_delta_rule_mtp(cache_replayssm=True, disable_state_update=True)``
 with FP32 128x128 checkpoints. For each layer, pass contiguous views into
@@ -35,8 +35,9 @@ settings for verify and commit.
 
 The tcgen05 verify specialization uses TMA and TF32 tensor cores for T=4..8,
 B=1..256, BF16 output, int32 indices, contiguous FP32 checkpoints, normalized
-Q/K and an even value-head/key-head ratio. Other supported SM100 inputs use
-the FP32 MTP fallback. TF32 contraction changes numerical reduction precision.
+Q/K and an even value-head/key-head ratio on SM100/SM103. Other supported
+SM100 inputs, and every SM120/SM121 input, use the FP32 MTP fallback. TF32
+contraction changes numerical reduction precision.
 See the API docstrings for shape, index uniqueness, padding and optional
 tracked-checkpoint contracts.
 
@@ -46,3 +47,5 @@ Other cases use SIMT. Explicit ``backend="tcgen05"`` supports T=4..8.
 The heuristic uses tensor metadata, not device-resident accepted lengths;
 short accepted prefixes may favor ``backend="simt"``. SIMT also retains FP32
 contractions when checkpoint accuracy is preferred over tensor-core throughput.
+On SM120/SM121 the commit always uses SIMT, and explicit ``backend="tcgen05"``
+raises.

@@ -1144,8 +1144,8 @@ flashinfer.gdn_decode.gated_delta_rule_mtp(
     q_m, k_m, v_m, init_state, init_idx, A_log_m, a_m, dt_bias_m, b_m
 )
 
-# ── ReplaySSM accepted-prefix commit (SM100/SM103) ────────────────────────
-if torch.cuda.get_device_capability()[0] == 10:
+# ── ReplaySSM accepted-prefix commit (SM100/SM103, SM120/SM121) ──────────
+if torch.cuda.get_device_capability()[0] in (10, 12):
     from flashinfer.trace.templates.gdn import gdn_replayssm_commit_trace
 
     flashinfer.gdn_decode.gated_delta_rule_replayssm_commit(

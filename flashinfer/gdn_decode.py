@@ -1203,7 +1203,7 @@ def gated_delta_rule_mtp(
         slot).  Negative entries skip the writeback for that batch
         (the read still runs).
     cache_replayssm : bool
-        SM100/SM103 only, FP32 checkpoint, K=V=128, T>=3.
+        SM100/SM103 and SM120/SM121 only, FP32 checkpoint, K=V=128, T>=3.
         Persist only the fold-every-commit ReplaySSM raw input window instead
         of full intermediate hidden-state snapshots. Requires frozen-state
         verify mode (``disable_state_update=True``), no
@@ -1218,7 +1218,8 @@ def gated_delta_rule_mtp(
 
         The tcgen05 TF32 specialization requires T=4..8, B=1..256, a
         contiguous checkpoint, BF16 output, int32 indices, Q/K normalization,
-        and even HV/H. Other supported SM100 cases use the FP32 MTP fallback.
+        and even HV/H, and runs on SM100/SM103 only. Every other supported
+        case, including all of SM120/SM121, uses the FP32 MTP fallback.
         TF32 changes reduction precision; outputs need not be bitwise equal
         to the fallback.
     replayssm_rawv : torch.Tensor, optional
@@ -1239,7 +1240,8 @@ def gated_delta_rule_mtp(
 
     Notes
     -----
-    - Standard MTP requires SM90 or later; ReplaySSM requires SM100/SM103.
+    - Standard MTP requires SM90 or later; ReplaySSM requires SM100/SM103
+      or SM120/SM121.
     - Supports ``T > 1`` (multiple token processing).
     - State layout is K-last: ``[pool_size, HV, V, K]``.
     - Optimized for speculative decoding verification scenarios.
@@ -1403,8 +1405,10 @@ def gated_delta_rule_mtp(
     if cache_replayssm:
         from .gdn_kernels.device_target import gdn_device_target
 
-        if gdn_device_target(q.device).major != 10:
-            raise ValueError("ReplaySSM caching currently requires SM100/SM103")
+        if gdn_device_target(q.device).major not in (10, 12):
+            raise ValueError(
+                "ReplaySSM caching currently requires SM100/SM103 or SM120/SM121"
+            )
         assert disable_state_update, (
             "ReplaySSM verify must leave the checkpoint frozen "
             "(disable_state_update=True)"
@@ -1567,7 +1571,8 @@ def gated_delta_rule_replayssm_commit(
     ----------
     checkpoint_state : torch.Tensor
         Contiguous FP32 ``[layers, slots, HV, 128, 128]`` state, K-last.
-        Updated in place. All tensors must be on the same SM100/SM103 device.
+        Updated in place. All tensors must be on the same SM100/SM103 or
+        SM120/SM121 device.
     rawv_cache : torch.Tensor
         Contiguous BF16 ``[layers, slots, HV, T, 128]`` raw V windows.
     rawk_cache : torch.Tensor
@@ -1600,7 +1605,8 @@ def gated_delta_rule_replayssm_commit(
         FP32 SIMT. Shorter accepted prefixes may favor explicit ``simt``;
         auto does not read accepted lengths back to the host.
         Explicit ``tcgen05`` supports normalized T=4..8 without tracking.
-        Use ``simt`` to retain FP32 contractions.
+        Use ``simt`` to retain FP32 contractions. tcgen05 is SM100/SM103
+        only; on SM120/SM121 auto always selects SIMT.
 
     Notes
     -----
